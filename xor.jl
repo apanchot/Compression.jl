@@ -24,6 +24,8 @@ end
 
 
 
+
+
 function xorf(vals::Vector{Float64})
     newvals = Vector{UInt64}(undef,length(vals)) # convert floats to uint
     vals = reinterpret.(UInt64,vals) 
@@ -40,10 +42,9 @@ function xorpackbits(vals::Vector{UInt64})
     bitarr = BitArray(undef,0)
     hex = digits.(UInt8,vals, base=16, pad=16) # keep in hex format
     for h in hex[1]
-        # for b in digits(UInt8,h, base=2,pad=4)
-        #     push!(bitarr, b)
-        # end
-        append!(bitarr, hex2bit(h))
+        for b in digits(UInt8,h, base=2,pad=4)
+            push!(bitarr, b)
+        end
     end
     prevlz = Int8(65)
     prevtz = Int8(65)
@@ -61,26 +62,23 @@ function xorpackbits(vals::Vector{UInt64})
                 # println("0: ",v)
                 # println(v[prevtz+1:16-prevlz])
                 for h in v[prevtz+1:16-prevlz] # significant bits
-                    # for b in digits(UInt8,h, base=2,pad=4)
-                    #     push!(bitarr, b)
-                    # end
-                    append!(bitarr, hex2bit(h))
+                    for b in digits(UInt8,h, base=2,pad=4)
+                        push!(bitarr, b)
+                    end
                 end
             else
                 push!(bitarr, UInt8(1))
                 # println("1: ",v)
-                # for b in digits(UInt8,curlz, base=2,pad=4) # leading zeroes # pad with 4?
-                #     push!(bitarr, b)
-                # end
-                append!(bitarr, hex2bit(curlz))
+                for b in digits(UInt8,curlz, base=2,pad=4) # leading zeroes # pad with 4?
+                    push!(bitarr, b)
+                end
                 for b in digits(UInt8,16-curtz-curlz, base=2,pad=5) # num of significant bits # pad with 5?
                     push!(bitarr, b)
                 end
                 for h in v[curtz+1:16-curlz] # significant bits
-                    # for b in digits(UInt8,h, base=2,pad=4)
-                    #     push!(bitarr, b)
-                    # end
-                    append!(bitarr, hex2bit(h))
+                    for b in digits(UInt8,h, base=2,pad=4)
+                        push!(bitarr, b)
+                    end
                 end
                 prevlz = curlz
                 prevtz = curtz
@@ -95,22 +93,17 @@ function xorpackbits(vals::Vector{UInt64})
     return bitarr
 end
 
-
-
 function xorunpackbits(vals::BitArray)
-    bitarr = Vector{UInt64}(undef,vals.chunks[1])
-    bitarr[1] = vals.chunks[2]
+    bitarr = Vector{UInt64}()
+    
+    push!(bitarr, vals.chunks[2])
     ii = 129
-    bitarrct = 2
-    vt2 = UInt64(0)
-    hz = UInt8(0) #  num of hex zeros 
-    vt = UInt64(0)
+    hz = UInt8(0) # num of hex zeros 
     hsd = UInt8(0) # num of significant digits
-    while bitarrct <= vals.chunks[1]
+    while length(bitarr) < vals.chunks[1]
         # println(vals[ii:ii+1])
         if vals[ii] == UInt8(0) # xor is 0, value is same as last
-            bitarr[bitarrct] = bitarr[bitarrct-1]
-            bitarrct += 1
+            push!(bitarr, bitarr[end])
             ii += 1
         else
             ii += 1
@@ -137,32 +130,27 @@ function xorunpackbits(vals::BitArray)
                 for (i,tt) in enumerate(reverse(vt))
                     vt2 += tt * 2 ^ (i-1)
                 end
-                bitarr[bitarrct] = xor(bitarr[bitarrct-1],UInt64(vt2))
-                bitarrct += 1
+                push!(bitarr, xor(bitarr[end],UInt64(vt2)))
                 ii = ii+9+hsd*4 # move index to next
             else # second control bit is 0
                 ii += 1
                 # reuse hsd and hz from last time
-                vt = vals[ii:ii+hsd*4-1] # important bits
+                vt = reverse(vals[ii:ii+hsd*4-1]) # important bits
                 # println(reverse(vt))
                 # println(hz)
-                # for _ in 1:hz*4 # add first bits
-                #     push!(vt,UInt8(0))
-                # end
-                for _ in 1:16-hz-hsd
-                    vt = vt << 4
+                for _ in 1:hz*4 # add first bits
+                    pushfirst!(vt,UInt8(0))
                 end
-                # for _ in 1:64-length(vt) # add last bits
-                #     pushfirst!(vt,UInt8(0))
-                # end
+                for _ in 1:64-length(vt) # add last bits
+                    push!(vt,UInt8(0))
+                end
                 # println(vt)
 
                 vt2 = UInt64(0) # get UInt64 from vt bits
-                for (i,tt) in enumerate(vt)
+                for (i,tt) in enumerate(reverse(vt))
                     vt2 += tt * 2 ^ (i-1)
                 end
-                bitarr[bitarrct] = xor(bitarr[bitarrct-1],UInt64(vt2))
-                bitarrct += 1
+                push!(bitarr, xor(bitarr[end],UInt64(vt2)))
                 ii = ii+hsd*4 # move index to next
 
             end
@@ -191,4 +179,4 @@ reinterpret(UInt64,
 sum([x*2^(i-1) for (i,x) in enumerate([0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1])])
 )
 
-UInt32(0x0a) << 4 << 4
+
