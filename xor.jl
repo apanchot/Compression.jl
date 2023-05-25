@@ -1,3 +1,6 @@
+using ProfileView
+
+
 function lz_zeros(vals::UInt64) 
     d = digits(UInt8,vals, base=16,pad=16)
     l = Int8(0)
@@ -94,89 +97,100 @@ function xorpackbits(vals::Vector{UInt64})
 end
 
 function xorunpackbits(vals::BitArray)
-    bitarr = Vector{UInt64}()
+    bitarr = Vector{UInt64}(undef,vals.chunks[1])
     
-    push!(bitarr, vals.chunks[2])
+    bitarr[1] = vals.chunks[2]
     ii = 129
     hz = UInt8(0) # num of hex zeros 
     hsd = UInt8(0) # num of significant digits
-    while length(bitarr) < vals.chunks[1]
-        # println(vals[ii:ii+1])
+    vt = UInt64(0)
+    bitarrit = 2
+    iii = UInt8(0)
+    while bitarrit <= vals.chunks[1]
         if vals[ii] == UInt8(0) # xor is 0, value is same as last
-            push!(bitarr, bitarr[end])
+            bitarr[bitarrit] = bitarr[bitarrit-1]
             ii += 1
         else
             ii += 1
             if vals[ii] == UInt8(1) # xor is 0, value is same as last
+
                 ii += 1
                 hz = UInt8(0) # num of hex zeros , mult by 4 to get bit
-                for (i,tt) in enumerate(vals[ii:ii+3])
-                    hz += tt * 2 ^ (i-1)
+                iii = UInt8(0)
+            
+                for tt in ii:ii+3
+                    if vals[tt]
+                        hz += UInt8(1) << iii #* 2 ^ (i-1)
+                    end
+                    iii += UInt8(1)
                 end
+                
                 hsd = UInt8(0) # num of significant digits , mult by 4 to get bit
-                for (i,tt) in enumerate(vals[ii+4:ii+8])
-                    hsd += tt * 2 ^ (i-1)
+                iii = UInt8(0)
+                for tt in ii+4:ii+8
+                    if vals[tt]
+                        hsd += UInt8(1) << iii #* 2 ^ (i-1)
+                    end
+                    iii += UInt8(1)
                 end
-                vt = reverse(vals[ii+9:ii+8+hsd*4]) # important bits
-                # println(reverse(vt))
-                for _ in 1:hz*4 # add first bits
-                    pushfirst!(vt,UInt8(0))
+                vt = UInt64(0)
+                for i in ii+9:ii+8+hsd*4 # important bits
+                    if vals[i]
+                        vt += UInt64(1)
+                        vt <<= 1
+                    else
+                        vt <<= 1
+                    end
                 end
-                for _ in 1:64-length(vt) # add last bits
-                    push!(vt,UInt8(0))
+                vt = bitreverse(vt)
+                for _ in 1:hz*4-1
+                    vt >>= 1
                 end
-
-                vt2 = UInt64(0) # get UInt64 from vt bits
-                for (i,tt) in enumerate(reverse(vt))
-                    vt2 += tt * 2 ^ (i-1)
-                end
-                push!(bitarr, xor(bitarr[end],UInt64(vt2)))
+                bitarr[bitarrit] = xor(bitarr[bitarrit-1],vt)
                 ii = ii+9+hsd*4 # move index to next
+                
             else # second control bit is 0
                 ii += 1
-                # reuse hsd and hz from last time
-                vt = reverse(vals[ii:ii+hsd*4-1]) # important bits
-                # println(reverse(vt))
-                # println(hz)
-                for _ in 1:hz*4 # add first bits
-                    pushfirst!(vt,UInt8(0))
+                vt = UInt64(0)
+                for i in ii:ii-1+hsd*4 # important bits
+                    if vals[i]
+                        vt += UInt64(1)
+                        vt <<= 1
+                    else
+                        vt <<= 1
+                    end
                 end
-                for _ in 1:64-length(vt) # add last bits
-                    push!(vt,UInt8(0))
+                vt = bitreverse(vt)
+                for _ in 1:hz*4-1
+                    vt >>= 1
                 end
-                # println(vt)
 
-                vt2 = UInt64(0) # get UInt64 from vt bits
-                for (i,tt) in enumerate(reverse(vt))
-                    vt2 += tt * 2 ^ (i-1)
-                end
-                push!(bitarr, xor(bitarr[end],UInt64(vt2)))
+                bitarr[bitarrit] = xor(bitarr[bitarrit-1],vt)
                 ii = ii+hsd*4 # move index to next
 
             end
 
         end
+        bitarrit += 1
     end
     return bitarr
 end
 
 
-n=Int(1e6)
+n=Int(1e7)
 v = sort(rand(n))
-# v = rand(n)
+reinterpret.(UInt64,v)
+
 
 @time x = xorf(v)
 
 length(x)/(n*64)
-@time xorunpackbits(x)
-reinterpret.(Float64,xorunpackbits(x)) == v
+# ProfileView.@profview 
+@time xx = xorunpackbits(x)
+reinterpret.(Float64,xx) == v
 
 
+2^47
 
 
-
-reinterpret(UInt64,
-sum([x*2^(i-1) for (i,x) in enumerate([0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1])])
-)
-
-
+reinterpret(UInt64,'A')

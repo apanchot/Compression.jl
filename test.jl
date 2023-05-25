@@ -192,3 +192,5 @@ sum([x*2^(i-1) for (i,x) in enumerate([0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1,
 )
 
 UInt32(0x0a) << 4 << 4
+UInt8(1)
+@time bitreverse(UInt8(0xf))
